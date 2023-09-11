@@ -11,11 +11,13 @@ import logging
 from os import path
 
 import numpy as np
+import dill as pickle
 from FlowCytometryTools import FCMeasurement
 from FlowCytometryTools import PolyGate as _PolyG
 from FlowCytometryTools import QuadGate as _QuadG
 from FlowCytometryTools import ThresholdGate as _ThreshG
 from FlowCytometryTools import IntervalGate as _IntG
+import copy
 
 md_logger = logging.getLogger(__name__)
 md_logger.setLevel(logging.DEBUG)
@@ -53,6 +55,8 @@ class Workspace(object):
 
     def __init__(self, pth=None):
         loaded = False
+        self._transform='asinh'
+
         if not path.isdir(pth):
             try:
                 r = Workspace.load(pth)
@@ -99,7 +103,7 @@ class Workspace(object):
     @LinearRange.setter
     def LinearRange(self, value):
         for s in self.samples.values():
-            s.LinearRange = value
+            s.LinearRange = dict((el, value) for el in self.fluorescent_channel_names)
         self._LinearRange = value
 
     @property
@@ -122,10 +126,13 @@ class Workspace(object):
         import glob
         import os
         from pathlib import Path
+        from natsort import natsorted  
 
         fnames = glob.glob(
             self.datadir + "**" + os.path.sep + "*.[fF][cC][sS]", recursive=True
         )
+
+        fnames = natsorted(fnames) 
 
         for file in fnames:
             self.samples[Path(file).stem] = self._FlowMeasurement(
@@ -162,7 +169,9 @@ class Workspace(object):
 
         """
         g = self._FlowGroup(**kwargs)
+        assert g.samples.keys(), 'cannot create empty group!'
         self.groups[g.name] = g
+
 
     def __call__(self):
         print("Workspace object for  " + str(self.datadir) + ".")
@@ -244,7 +253,7 @@ class _FCG(object):
         from oyFlow.Utilities import findregexp
 
         self.workspace = outer
-        self.gates = ordDict({"root": outer._rootgate})
+        self.gates = ordDict({"root": copy.deepcopy(outer._rootgate)})
         self.fluorescent_channel_names = self.workspace.fluorescent_channel_names
         self.channel_names = self.workspace.fluorescent_channel_names
         self.compmat = np.eye(len(self.fluorescent_channel_names))
@@ -352,7 +361,7 @@ class _FCG(object):
         Apply transform to all samples.
         Parameters
         ==========
-        transform=[*asinh* with self.LinearRange| 'hlog' | 'tlog' | 'glog' | callable]
+        transform=[*asinh* with self.LinearRange| 'hlog' | 'tlog' | 'glog' | 'None' | callable]
         direction='forward',
         channels : By default, all fluorescent channels
         return_all=True,
@@ -411,6 +420,20 @@ class _FCG(object):
         for id in self.IDs[1:]:
             things = pd.concat(
                 [things, self.samples[id][ChanList].mean()], axis=1, ignore_index=True
+            )
+        things.columns = self.IDs
+        return things.T
+
+    @property
+    def mode(self, ChanList=None):
+        if ChanList is None:
+            ChanList = self.fluorescent_channel_names
+        import pandas as pd
+
+        things = self.samples[0][ChanList].mode().iloc[[0]].squeeze()
+        for id in self.IDs[1:]:
+            things = pd.concat(
+                [things, self.samples[id][ChanList].mode().iloc[[0]].squeeze()], axis=1, ignore_index=True
             )
         things.columns = self.IDs
         return things.T
@@ -537,8 +560,9 @@ class _FCM(FCMeasurement):
         self.fluorescent_channel_names = list(ChanList)
         self.LinearRange = dict((el, LinearRange) for el in ChanList)
         self.workspace = workspace
-        self.gates = ordDict({"root": workspace._rootgate})
+        self.gates = ordDict({"root": copy.deepcopy(workspace._rootgate)})
         self.compmat = np.eye(len(self.fluorescent_channel_names))
+
 
     def __call__(self):
         print("Sample object for  experiment " + str(self.workspace.datadir) + ".")
@@ -569,9 +593,21 @@ class _FCM(FCMeasurement):
 
     def copy(self):
         import copy
-
         return copy.deepcopy(self)
-
+    
+    @property
+    def raw_data(self):
+        return super().data
+    
+    @property
+    def tc_data(self):
+        # transformed and compensated data based on W._transform and W._compmat
+        return self.transform(self.workspace._transform).compensate(self.workspace.compmat).data
+    
+    # Make it so that when you subscript directly into the class instance you get the transformed and compensated data
+    def __getitem__(self, key):
+        return self.tc_data.__getitem__(key)
+    
     def compensate(self, compmat=None):
         """
         Apply compensation matrix to sample. If not provided, the self.compmat will be applied
@@ -609,19 +645,22 @@ class _FCM(FCMeasurement):
         """
         if channels is None:
             channels = self.fluorescent_channel_names
-        if transform != "asinh":
-            tmpsample = FCMeasurement.transform(
-                self, transform=transform, channels=channels, **kwargs
-            )
-        else:
+        if transform==None:
             tmpsample = self.copy()
-            new_data = tmpsample.data
-            for chan in channels:
-                new_data[chan] = np.arcsinh(new_data[chan] / self.LinearRange[chan])
-            tmpsample.data = new_data
+        else:
+            if transform != "asinh":
+                tmpsample = FCMeasurement.transform(
+                    self, transform=transform, channels=channels, **kwargs
+                )
+            elif transform == "asinh":
+                tmpsample = self.copy()
+                new_data = tmpsample.data
+                for chan in channels:
+                    new_data[chan] = np.arcsinh(new_data[chan] / self.LinearRange[chan])
+                tmpsample.data = new_data
         return tmpsample
 
-    def apply_gate(self, gate=None, apply_parents=True):
+    def apply_gate(self, gate=None, apply_parents=True, verbose=True):
         """
         Apply gate to sample. Applies the gate and all of it's parents(?).
         Parameters
@@ -631,8 +670,9 @@ class _FCM(FCMeasurement):
 
         """
         tmpsample = self.copy()
-        if gate is None:
-            print("No gate supplied, didn't do anything")
+        if gate == None or gate == 'root':
+            if verbose:
+                print("No gate supplied, didn't do anything")
             return tmpsample
         assert isinstance(gate, str), "gate must be a string"
         assert gate in self.gates.keys(), "gate must be appended to sample"
@@ -645,7 +685,7 @@ class _FCM(FCMeasurement):
 
     def append_gate(self, gate=None, update=False):
         """
-        append gate to sample. Appends  gate and all of it's parents.
+        append gate to sample. Parent must be already appended to the sample
         Parameters
         ==========
         gate : str
@@ -660,12 +700,9 @@ class _FCM(FCMeasurement):
             assert gate.name not in list(
                 self.gates
             ), "New gate must have unique name. If you want to update a gate change the update flag to True"
-
-        if isinstance(gate.parent, (_PolyG, _QuadG, _ThreshG, _IntG)):
-            self.append_gate(gate=gate.parent, update=True)
-        else:
+        if not isinstance(gate.parent, (_PolyG, _QuadG, _ThreshG, _IntG)):
             gate.parent = self.gates["root"]
-        self.gates[gate.name] = copy.deepcopy(gate)
+        self.gates[gate.name] = gate
 
     def remove_gate(self, gate=None):
         """
