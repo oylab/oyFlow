@@ -55,7 +55,7 @@ class Workspace(object):
 
     def __init__(self, pth=None):
         loaded = False
-        self._transform='asinh'
+        self._transform = "asinh"
 
         if not path.isdir(pth):
             try:
@@ -115,8 +115,6 @@ class Workspace(object):
 
     @compmat.setter
     def compmat(self, value):
-        for s in self.samples.values():
-            s.compmat = value
         self._compmat = value
 
     def _load_samples(self):
@@ -126,13 +124,13 @@ class Workspace(object):
         import glob
         import os
         from pathlib import Path
-        from natsort import natsorted  
+        from natsort import natsorted
 
         fnames = glob.glob(
             self.datadir + "**" + os.path.sep + "*.[fF][cC][sS]", recursive=True
         )
 
-        fnames = natsorted(fnames) 
+        fnames = natsorted(fnames)
 
         for file in fnames:
             self.samples[Path(file).stem] = self._FlowMeasurement(
@@ -169,9 +167,8 @@ class Workspace(object):
 
         """
         g = self._FlowGroup(**kwargs)
-        assert g.samples.keys(), 'cannot create empty group!'
+        assert g.samples.keys(), "cannot create empty group!"
         self.groups[g.name] = g
-
 
     def __call__(self):
         print("Workspace object for  " + str(self.datadir) + ".")
@@ -256,8 +253,9 @@ class _FCG(object):
         self.gates = ordDict({"root": copy.deepcopy(outer._rootgate)})
         self.fluorescent_channel_names = self.workspace.fluorescent_channel_names
         self.channel_names = self.workspace.fluorescent_channel_names
-        self.compmat = np.eye(len(self.fluorescent_channel_names))
         self.LinearRange = dict((el, 150) for el in self.fluorescent_channel_names)
+        self._compmat=np.eye(len(self.workspace.fluorescent_channel_names))
+        self._transform = 'None'
 
         if name is None:
             if pattern is not None:
@@ -305,13 +303,13 @@ class _FCG(object):
     def workspace(self, value):
         self._workspace = value
 
-    @property
-    def compmat(self):
-        return self._compmat
+    # @property
+    # def compmat(self):
+    #     return self._compmat
 
-    @compmat.setter
-    def compmat(self, value):
-        self._compmat = value
+    # @property
+    # def _transform(self):
+    #     return self._workspace._transform
 
     def append(self, ID):
         self.IDs.append(ID)
@@ -319,11 +317,12 @@ class _FCG(object):
     def remove(self, ID):
         self.IDs.remove(ID)
 
-    def append_group_gate(self, gate,update=False):
+    def append_group_gate(self, gate):
         from copy import deepcopy
 
+        gate = deepcopy(gate)
         for s in self.samples.values():
-            s.append_gate(gate, update=update)
+            s.append_gate(gate)
         self.gates = deepcopy(self.samples[0].gates)
 
     def remove_group_gate(self, gate):
@@ -356,7 +355,7 @@ class _FCG(object):
         tmp.samples = tmpsamps
         return tmp
 
-    def transform(self, transform="asinh", channels=None, **kwargs):
+    def transform(self, transform=None, channels=None, **kwargs):
         """
         Apply transform to all samples.
         Parameters
@@ -379,6 +378,9 @@ class _FCG(object):
 
         from copy import deepcopy
 
+        if transform is None:
+            transform = self.workspace._transform
+        
         tmp = _FCG_nosamps(
             self
         )  # this is a weird hack so that this function returns a group
@@ -388,6 +390,7 @@ class _FCG(object):
                 transform=transform, channels=channels, **kwargs
             )
         tmp.samples = tmpsamps
+        tmp._transform = transform
         return tmp
 
     def compensate(self, compmat=None):
@@ -399,6 +402,11 @@ class _FCG(object):
 
         returns a group with compensated samples
         """
+        if compmat is None:
+            compmat = self.workspace._compmat
+        if np.any(compmat == 'None'):
+            compmat = np.eye(len(self.fluorescent_channel_names))
+
         from copy import deepcopy
 
         tmp = _FCG_nosamps(
@@ -408,6 +416,7 @@ class _FCG(object):
         for name, s in tmpsamps.items():
             tmpsamps[name] = tmpsamps[name].compensate(compmat=compmat)
         tmp.samples = tmpsamps
+        tmp._compmat = compmat
         return tmp
 
     @property
@@ -433,7 +442,9 @@ class _FCG(object):
         things = self.samples[0][ChanList].mode().iloc[[0]].squeeze()
         for id in self.IDs[1:]:
             things = pd.concat(
-                [things, self.samples[id][ChanList].mode().iloc[[0]].squeeze()], axis=1, ignore_index=True
+                [things, self.samples[id][ChanList].mode().iloc[[0]].squeeze()],
+                axis=1,
+                ignore_index=True,
             )
         things.columns = self.IDs
         return things.T
@@ -561,8 +572,8 @@ class _FCM(FCMeasurement):
         self.LinearRange = dict((el, LinearRange) for el in ChanList)
         self.workspace = workspace
         self.gates = ordDict({"root": copy.deepcopy(workspace._rootgate)})
-        self.compmat = np.eye(len(self.fluorescent_channel_names))
-
+        self._compmat = np.eye(len(self.fluorescent_channel_names))
+        self._transform = 'None'
 
     def __call__(self):
         print("Sample object for  experiment " + str(self.workspace.datadir) + ".")
@@ -583,31 +594,15 @@ class _FCM(FCMeasurement):
     def workspace(self, value):
         self._workspace = value
 
-    @property
-    def compmat(self):
-        return self._compmat
-
-    @compmat.setter
-    def compmat(self, value):
-        self._compmat = value
-
     def copy(self):
         import copy
+
         return copy.deepcopy(self)
-    
+
     @property
     def raw_data(self):
         return super().data
-    
-    @property
-    def tc_data(self):
-        # transformed and compensated data based on W._transform and W._compmat
-        return self.transform(self.workspace._transform).compensate(self.workspace.compmat).data
-    
-    # Make it so that when you subscript directly into the class instance you get the transformed and compensated data
-    def __getitem__(self, key):
-        return self.tc_data.__getitem__(key)
-    
+
     def compensate(self, compmat=None):
         """
         Apply compensation matrix to sample. If not provided, the self.compmat will be applied
@@ -616,15 +611,18 @@ class _FCM(FCMeasurement):
         compmat - [self.compmat]
         """
         if compmat is None:
-            compmat = self._compmat
+            compmat = self.workspace._compmat
+        if np.any(compmat == 'None'):
+            compmat = np.eye(len(self.fluorescent_channel_names))
         chan = self.fluorescent_channel_names
         tmpsample = self.copy()
         new_data = tmpsample.data
         new_data[chan] = new_data[chan].dot(compmat)
         tmpsample.data = new_data
+        tmpsample._compmat = compmat
         return tmpsample
 
-    def transform(self, transform="asinh", channels=None, **kwargs):
+    def transform(self, transform=None, channels=None, **kwargs):
         """
         Apply transform to sample.
         Parameters
@@ -643,9 +641,12 @@ class _FCM(FCMeasurement):
 
 
         """
+        if transform is None:
+            transform = self.workspace._transform
+            
         if channels is None:
             channels = self.fluorescent_channel_names
-        if transform==None:
+        if transform == 'None':
             tmpsample = self.copy()
         else:
             if transform != "asinh":
@@ -658,6 +659,7 @@ class _FCM(FCMeasurement):
                 for chan in channels:
                     new_data[chan] = np.arcsinh(new_data[chan] / self.LinearRange[chan])
                 tmpsample.data = new_data
+        tmpsample._transform = transform
         return tmpsample
 
     def apply_gate(self, gate=None, apply_parents=True, verbose=True):
@@ -670,7 +672,7 @@ class _FCM(FCMeasurement):
 
         """
         tmpsample = self.copy()
-        if gate == None or gate == 'root':
+        if gate == None or gate == "root":
             if verbose:
                 print("No gate supplied, didn't do anything")
             return tmpsample
@@ -680,7 +682,11 @@ class _FCM(FCMeasurement):
         if apply_parents:
             if isinstance(gate.parent, (_PolyG, _QuadG, _ThreshG, _IntG)):
                 tmpsample = tmpsample.apply_gate(gate=gate.parent.name)
+
+        assert tmpsample._transform == gate._transform, 'can\'t apply gate to a sample with a different transform. try to add .transform()'
+        assert np.all(tmpsample._compmat == gate._compmat), 'can\'t apply gate to a sample with a different compensation matrix. Try to add .compensate()'
         tmpsample = tmpsample.gate(gate)
+
         return tmpsample
 
     def append_gate(self, gate=None, update=False):
@@ -692,17 +698,22 @@ class _FCM(FCMeasurement):
         """
         import copy
 
+        gate = copy.deepcopy(gate)
         if gate is None:
             print("No gate supplied, didn't do anything")
             return
         assert not isinstance(gate, rootGate), "Can not have multiple roots"
-        if not update:
-            assert gate.name not in list(
-                self.gates
-            ), "New gate must have unique name. If you want to update a gate change the update flag to True"
-        if not isinstance(gate.parent, (_PolyG, _QuadG, _ThreshG, _IntG)):
-            gate.parent = self.gates["root"]
+
+        if gate.name in list(self.gates):
+            print("gate already exists in sample, skipping!")
+            return
+
         self.gates[gate.name] = gate
+        if gate.parent.name not in list(self.gates):
+            self.append_gate(gate.parent)
+
+        gate.children = ()
+        gate.parent = self.gates[gate.parent.name]
 
     def remove_gate(self, gate=None):
         """
@@ -723,6 +734,8 @@ class _FCM(FCMeasurement):
                 if c.name in self.gates.keys():
                     self.remove_gate(gate=c.name)
         if gate.name in self.gates.keys():
+            self.gates[gate.name].parent = None
+            self.gates[gate.name].children = ()
             del self.gates[gate.name]
 
     def print_gates(self):
@@ -763,24 +776,80 @@ class rootGate(NodeMixin):
 
 
 class PolyGate(_PolyG, NodeMixin):
-    def __init__(self, vert, channels, parent=None, **kwargs):
+    def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
         _PolyG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
+        self._workspace = workspace
+        self._compmat = copy.deepcopy(workspace._compmat)
+        self._transform = copy.deepcopy(workspace._transform)
+
+    def selector(self, ax, alpha=0.2, color="tab:blue"):
+        from matplotlib.widgets import PolygonSelector
+        from oyFlow.Gating import inverse_transform, transform
+
+        def _onselectpoly(verts):
+            self.vert = verts
+
+        span = PolygonSelector(
+            ax,
+            _onselectpoly,
+            useblit=True,
+            props=dict(alpha=alpha, color=color),
+        )
+
+        span._selection_completed = True
+        verts_tmp = self.vert
+
+        span.verts = verts_tmp
+
+        return span
 
 
 class QuadGate(_QuadG, NodeMixin):
-    def __init__(self, vert, channels, parent=None, **kwargs):
+    def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
         _QuadG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
+        self._workspace = workspace
+        self._compmat = copy.deepcopy(workspace._compmat)
+        self._transform = copy.deepcopy(workspace._transform)
 
 
 class ThresholdGate(_ThreshG, NodeMixin):
-    def __init__(self, vert, channels, parent=None, **kwargs):
+    def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
         _ThreshG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
+        self._workspace = workspace
+        self._compmat = copy.deepcopy(workspace._compmat)
+        self._transform = copy.deepcopy(workspace._transform)
 
 
 class IntervalGate(_IntG, NodeMixin):
-    def __init__(self, vert, channels, parent=None, **kwargs):
+    def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
         _IntG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
+        self._workspace = workspace
+        self._compmat = copy.deepcopy(workspace._compmat)
+        self._transform = copy.deepcopy(workspace._transform)
+
+    def selector(self, ax, alpha=0.2, color="tab:blue"):
+        from matplotlib.widgets import SpanSelector
+        from oyFlow.Gating import inverse_transform, transform
+
+        def _onselectspan(xmin, xmax):
+            self.vert = (xmin, xmax)
+
+        span = SpanSelector(
+            ax,
+            _onselectspan,
+            "horizontal",
+            useblit=True,
+            props=dict(alpha=alpha, facecolor=color, edgecolor=color),
+            interactive=True,
+            drag_from_anywhere=False,
+            ignore_event_outside=True,
+        )
+        span._selection_completed = True
+
+        span.extents = self.vert
+
+        return span
