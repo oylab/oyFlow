@@ -1,6 +1,8 @@
 from oyFlow.Flow import Workspace
 from PyQt5.QtWidgets import QTreeWidgetItem
 import numpy as np
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 def _get_ticks(W):
@@ -216,7 +218,7 @@ def gater(W):
         )
 
         # append to sample
-        W.groups[widget.group.value].samples[widget.sample.value].append_gate(
+        g = W.groups[widget.group.value].samples[widget.sample.value].append_gate(
             gate=gate, update=True
         )
 
@@ -224,7 +226,10 @@ def gater(W):
         widget._active_gate.set_active(False)
         widget._active_gate.set_visible(False)
         widget._active_gate.clear()
-        _on_sample_changed()
+        if g:
+            widget._gates.append(g.selector(ax, color=next(cmaps)))
+            _refresh_tree()
+
 
     def _onspanbutton():
         """
@@ -275,7 +280,7 @@ def gater(W):
         )
 
         # append to sample
-        W.groups[widget.group.value].samples[widget.sample.value].append_gate(
+        g = W.groups[widget.group.value].samples[widget.sample.value].append_gate(
             gate=gate, update=True
         )
 
@@ -283,7 +288,9 @@ def gater(W):
         widget._active_gate.set_active(False)
         widget._active_gate.set_visible(False)
         widget._active_gate.clear()
-        _on_sample_changed()
+        if g:
+            widget._gates.append(g.selector(ax, color=next(cmaps)))
+            _refresh_tree()
 
     def _onpolybutton():
         """
@@ -337,7 +344,7 @@ def gater(W):
         )
 
         # append to sample
-        W.groups[widget.group.value].samples[widget.sample.value].append_gate(
+        g = W.groups[widget.group.value].samples[widget.sample.value].append_gate(
             gate=gate, update=True
         )
 
@@ -345,7 +352,10 @@ def gater(W):
         widget._active_gate.set_active(False)
         widget._active_gate.set_visible(False)
         widget._active_gate.clear()
-        _on_sample_changed()
+        if g:
+            widget._gates.append(g.selector(ax, color=next(cmaps)))
+            _refresh_tree()
+
 
     def _onrectbutton():
         """
@@ -593,6 +603,10 @@ def gater(W):
     # Callbacks for sample change:
     @widget.sample.changed.connect
     def _on_sample_changed():
+        _refresh_tree()
+        widget()
+
+    def _refresh_tree():
         widget.population.choices = list(
             W.groups[widget.group.value].samples[widget.sample.value].gates.keys()
         )
@@ -603,7 +617,6 @@ def gater(W):
             W.groups[widget.group.value].samples[widget.sample.value].gates[0],
         )
         set_item_by_name(widget.pop_tree_widget, item_name=popname)
-        widget()
 
     # Callbacks for group change:
     @widget.group.changed.connect

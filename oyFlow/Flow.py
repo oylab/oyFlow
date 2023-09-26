@@ -11,7 +11,6 @@ import logging
 from os import path
 
 import numpy as np
-import dill as pickle
 from FlowCytometryTools import FCMeasurement
 from FlowCytometryTools import PolyGate as _PolyG
 from FlowCytometryTools import QuadGate as _QuadG
@@ -714,6 +713,7 @@ class _FCM(FCMeasurement):
 
         gate.children = ()
         gate.parent = self.gates[gate.parent.name]
+        return gate
 
     def remove_gate(self, gate=None):
         """
