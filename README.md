@@ -8,10 +8,9 @@ Code for analysis of flow cytometry data. Based heavily on [FlowCytometryTools](
 conda create --name oyflow python=3.9 scipy
 
 conda activate oyflow
-```
-## if you have cuda 11.2:
 
-`pip install git+https://github.com/oylab/oyFlow.git#egg=oyFlow`
+pip install git+https://github.com/oylab/oyFlow.git#egg=oyFlow
+```
 
 ### **add kernel to jupyter:**
 
@@ -27,8 +26,9 @@ cd oyFlow
 conda create --name oyflow python=3.9 scipy
 
 conda activate oyflow
+
+pip install -e .
 ```
-`pip install -e .`
 
 ### **add kernel to jupyter:**
 
