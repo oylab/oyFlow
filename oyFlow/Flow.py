@@ -17,6 +17,10 @@ from FlowCytometryTools import QuadGate as _QuadG
 from FlowCytometryTools import ThresholdGate as _ThreshG
 from FlowCytometryTools import IntervalGate as _IntG
 import copy
+import warnings
+
+warnings.simplefilter(action='ignore', category=UserWarning)
+
 
 md_logger = logging.getLogger(__name__)
 md_logger.setLevel(logging.DEBUG)
@@ -64,33 +68,33 @@ class Workspace(object):
             except:
                 print(pth + " isn't a workspace, trying to load from fcs files")
         if not loaded:
-            try:
-                self.type = "Flow"
-                self.samples = ordDict()
-                self.groups = ordDict()
-                self._LinearRange = 150
-                if pth is None:
-                    return
+            #try:
+            self.type = "Flow"
+            self.samples = ordDict()
+            self.groups = ordDict()
+            self._LinearRange = 150
+            if pth is None:
+                return
 
-                if path.isdir(pth):
-                    self.datadir = pth
-                else:
-                    self.datadir, _ = path.split(pth)
+            if path.isdir(pth):
+                self.datadir = pth
+            else:
+                self.datadir, _ = path.split(pth)
 
-                self._rootgate = rootGate()
+            self._rootgate = rootGate()
 
-                self.samples = self._load_samples()
-                self.fluorescent_channel_names = list(
-                    self.samples[0].fluorescent_channel_names
-                )
-                self.channel_names = list(self.samples[0].channel_names)
-                self._compmat = np.eye(len(self.fluorescent_channel_names))
-                self.IDs = list(self.samples)
-                self.groups["All Samples"] = self._FlowGroup(IDs=self.IDs)
-                loaded = True
-                print("\nloaded workspace from fcs files")
-            except:
-                print(pth + " nothing to load here")
+            self.samples = self._load_samples()
+            self.fluorescent_channel_names = list(
+                self.samples[0].fluorescent_channel_names
+            )
+            self.channel_names = list(self.samples[0].channel_names)
+            self._compmat = np.eye(len(self.fluorescent_channel_names))
+            self.IDs = list(self.samples)
+            self.groups["All Samples"] = self._FlowGroup(IDs=self.IDs)
+            loaded = True
+            print("\nloaded workspace from fcs files")
+            #except:
+            #    print(pth + " nothing to load here")
 
     @property
     def LinearRange(self):
@@ -319,7 +323,6 @@ class _FCG(object):
     def append_group_gate(self, gate):
         from copy import deepcopy
 
-        gate = deepcopy(gate)
         for s in self.samples.values():
             s.append_gate(gate)
         self.gates = deepcopy(self.samples[0].gates)
@@ -602,6 +605,13 @@ class _FCM(FCMeasurement):
     def raw_data(self):
         return super().data
 
+    def subsample(self,N=15000):
+        tmpsample = self.copy()
+        N = min(len(tmpsample.data),N)
+        new_data = tmpsample.data.sample(N)
+        tmpsample.data = new_data
+        return tmpsample
+
     def compensate(self, compmat=None):
         """
         Apply compensation matrix to sample. If not provided, the self.compmat will be applied
@@ -779,9 +789,8 @@ class PolyGate(_PolyG, NodeMixin):
     def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
         _PolyG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
-        self._workspace = workspace
-        self._compmat = copy.deepcopy(workspace._compmat)
-        self._transform = copy.deepcopy(workspace._transform)
+        self._compmat = workspace._compmat
+        self._transform = workspace._transform
 
     def selector(self, ax, alpha=0.2, color="tab:blue"):
         from matplotlib.widgets import PolygonSelector
@@ -809,27 +818,24 @@ class QuadGate(_QuadG, NodeMixin):
     def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
         _QuadG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
-        self._workspace = workspace
-        self._compmat = copy.deepcopy(workspace._compmat)
-        self._transform = copy.deepcopy(workspace._transform)
+        self._compmat = workspace._compmat
+        self._transform = workspace._transform
 
 
 class ThresholdGate(_ThreshG, NodeMixin):
     def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
         _ThreshG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
-        self._workspace = workspace
-        self._compmat = copy.deepcopy(workspace._compmat)
-        self._transform = copy.deepcopy(workspace._transform)
+        self._compmat = workspace._compmat
+        self._transform = workspace._transform
 
 
 class IntervalGate(_IntG, NodeMixin):
     def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
         _IntG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
-        self._workspace = workspace
-        self._compmat = copy.deepcopy(workspace._compmat)
-        self._transform = copy.deepcopy(workspace._transform)
+        self._compmat = workspace._compmat
+        self._transform = workspace._transform
 
     def selector(self, ax, alpha=0.2, color="tab:blue"):
         from matplotlib.widgets import SpanSelector

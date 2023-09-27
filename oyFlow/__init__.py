@@ -10,4 +10,4 @@ from . import Utilities
 from .Flow import Workspace
 from . import Gating
 
-os.environ["OMP_NUM_THREADS"] = "4"
+os.environ["OMP_NUM_THREADS"] = "8"

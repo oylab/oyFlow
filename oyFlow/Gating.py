@@ -186,225 +186,7 @@ def gater(W):
     fc = FigureCanvasQTAgg(mpl_fig)
     ax.set_position([0.18, 0.18, 0.8, 0.8])
 
-    # callbacks for initial gate selections
-    def _onselectspan(xmin, xmax):
-        """
-        Callback for when a span is selected using the SpanSelector widget
-        """
-        gate_name = (
-            "I_"
-            + widget.channel_1.value
-            + "_"
-            + widget.sample.value
-            + "_"
-            + widget.group.value
-            + "_"
-            + widget.population.value
-        )
-        gate_name = _prompt_for_gate_name(gate_name, W, widget)
-        if not gate_name:
-            return 0
-
-        # make gate
-        gate = IntervalGate(
-            (xmin, xmax),
-            channels=widget.channel_1.value,
-            region="in",
-            name=gate_name,
-            parent=W.groups[widget.group.value]
-            .samples[widget.sample.value]
-            .gates[widget.population.value],
-            workspace=W,
-        )
-
-        # append to sample
-        g = W.groups[widget.group.value].samples[widget.sample.value].append_gate(
-            gate=gate, update=True
-        )
-
-        gate.parent = None
-        widget._active_gate.set_active(False)
-        widget._active_gate.set_visible(False)
-        widget._active_gate.clear()
-        if g:
-            widget._gates.append(g.selector(ax, color=next(cmaps)))
-            _refresh_tree()
-
-
-    def _onspanbutton():
-        """
-        Callback for when span gate button is pushed, created a SpanSelector
-        """
-        span = SpanSelector(
-            ax,
-            _onselectspan,
-            "horizontal",
-            useblit=False,
-            props=dict(alpha=0.5, facecolor="tab:blue"),
-            interactive=True,
-            drag_from_anywhere=False,
-            ignore_event_outside=True,
-        )
-        widget._active_gate = span
-
-    def _onselectpoly(verts):
-        """
-        Callback for when a span is selected using the SpanSelector widget
-        """
-        gate_name = (
-            "P_"
-            + widget.channel_1.value
-            + "_"
-            + widget.channel_2.value
-            + "_"
-            + widget.sample.value
-            + "_"
-            + widget.group.value
-            + "_"
-            + widget.population.value
-        )
-        gate_name = _prompt_for_gate_name(gate_name, W, widget)
-        if not gate_name:
-            return 0
-
-        # make gate
-        gate = PolyGate(
-            verts,
-            channels=(widget.channel_1.value, widget.channel_2.value),
-            region="in",
-            name=gate_name,
-            parent=W.groups[widget.group.value]
-            .samples[widget.sample.value]
-            .gates[widget.population.value],
-            workspace=W,
-        )
-
-        # append to sample
-        g = W.groups[widget.group.value].samples[widget.sample.value].append_gate(
-            gate=gate, update=True
-        )
-
-        gate.parent = None
-        widget._active_gate.set_active(False)
-        widget._active_gate.set_visible(False)
-        widget._active_gate.clear()
-        if g:
-            widget._gates.append(g.selector(ax, color=next(cmaps)))
-            _refresh_tree()
-
-    def _onpolybutton():
-        """
-        Callback for when span gate button is pushed, created a SpanSelector
-        """
-        span = PolygonSelector(
-            ax,
-            _onselectpoly,
-            useblit=True,
-            props=dict(alpha=0.5, color="tab:blue"),
-        )
-        widget._active_gate = span
-
-    def _onselectrect(eclick, erelease):
-        """
-        Callback for when a span is selected using the SpanSelector widget
-        """
-
-        verts = [
-            (eclick.xdata, eclick.ydata),
-            (eclick.xdata, erelease.ydata),
-            (erelease.xdata, erelease.ydata),
-            (erelease.xdata, eclick.ydata),
-        ]
-        gate_name = (
-            "P_"
-            + widget.channel_1.value
-            + "_"
-            + widget.channel_2.value
-            + "_"
-            + widget.sample.value
-            + "_"
-            + widget.group.value
-            + "_"
-            + widget.population.value
-        )
-        gate_name = _prompt_for_gate_name(gate_name, W, widget)
-        if not gate_name:
-            return 0
-
-        # make gate
-        gate = PolyGate(
-            verts,
-            channels=(widget.channel_1.value, widget.channel_2.value),
-            region="in",
-            name=gate_name,
-            parent=W.groups[widget.group.value]
-            .samples[widget.sample.value]
-            .gates[widget.population.value],
-            workspace=W,
-        )
-
-        # append to sample
-        g = W.groups[widget.group.value].samples[widget.sample.value].append_gate(
-            gate=gate, update=True
-        )
-
-        gate.parent = None
-        widget._active_gate.set_active(False)
-        widget._active_gate.set_visible(False)
-        widget._active_gate.clear()
-        if g:
-            widget._gates.append(g.selector(ax, color=next(cmaps)))
-            _refresh_tree()
-
-
-    def _onrectbutton():
-        """
-        Callback for when span gate button is pushed, created a SpanSelector
-        """
-        span = RectangleSelector(
-            ax,
-            _onselectrect,
-            useblit=True,
-            interactive=True,
-            props=dict(alpha=0.5, color="tab:blue"),
-        )
-        widget._active_gate = span
-
-    def _onremovesamplegate():
-        """
-        Callback for when clicking the remove sample gate button
-        """
-        if widget.pop_tree_widget.currentItem():
-            current_item_name = widget.pop_tree_widget.currentItem().text(0)
-            assert current_item_name != "root", "Can't delete root!"
-            W.groups[widget.group.value].samples[widget.sample.value].remove_gate(
-                current_item_name
-            )
-            _on_sample_changed()
-
-    def _onaddgroupgate():
-        """
-        Callback for when clicking the add group gate button
-        """
-        if widget.pop_tree_widget.currentItem():
-            current_item_name = widget.pop_tree_widget.currentItem().text(0)
-            g = W.groups[widget.group.value]
-            s = W.groups[widget.group.value].samples[widget.sample.value]
-            g.append_group_gate(s.gates[current_item_name])
-            _on_sample_changed()
-
-    def _onremovegroupgate():
-        """
-        Callback for when clicking the remove group gate button
-        """
-        if widget.pop_tree_widget.currentItem():
-            current_item_name = widget.pop_tree_widget.currentItem().text(0)
-            assert current_item_name in list(
-                W.groups[widget.group.value].gates
-            ), "Not a group gate! You can delete it from the sample."
-            assert current_item_name != "root", "Can't delete root!"
-            W.groups[widget.group.value].remove_group_gate(current_item_name)
-            _on_sample_changed()
+    
 
     ### Define main widget
     @magicgui(
@@ -426,11 +208,9 @@ def gater(W):
     ):
         """Main widget for gating"""
         # get curent sample
+
         sample_d = (
-            W.groups[group]
-            .samples[sample]
-            .compensate(W._compmat)
-            .transform(W._transform)
+            widget._sample
             .apply_gate(population, verbose=False)
             .data
         )
@@ -450,13 +230,10 @@ def gater(W):
             x = sample_d[ch1_choice]
             y = sample_d[ch2_choice]
 
-            
-
-
             # Evaluate density at each data point
             if len(x) > 20:
                 xy = np.vstack([x, y])
-                kde = gaussian_kde(xy[:, : np.min((250, len(x)))])
+                kde = gaussian_kde(xy[:, : np.min((500, len(x)))],bw_method='scott')
                 density = kde(xy)
                 normalized_density = (density - density.min()) / (
                     density.max() - density.min()
@@ -536,6 +313,234 @@ def gater(W):
 
         fc.draw()
 
+
+    # callbacks for initial gate selections
+    def _onselectspan(xmin, xmax):
+        """
+        Callback for when a span is selected using the SpanSelector widget
+        """
+        gate_name = (
+            "I_"
+            + widget.channel_1.value
+            + "_"
+            + widget.sample.value
+            + "_"
+            + widget.group.value
+            + "_"
+            + widget.population.value
+        )
+        gate_name = _prompt_for_gate_name(gate_name, W, widget)
+        if not gate_name:
+            return 0
+
+        # make gate
+        gate = IntervalGate(
+            (xmin, xmax),
+            channels=widget.channel_1.value,
+            region="in",
+            name=gate_name,
+            parent=W.groups[widget.group.value]
+            .samples[widget.sample.value]
+            .gates[widget.population.value],
+            workspace=W,
+        )
+
+        # append to sample
+        g = W.groups[widget.group.value].samples[widget.sample.value].append_gate(
+            gate=gate, update=True
+        )
+
+        gate.parent = None
+        widget._active_gate.set_active(False)
+        widget._active_gate.set_visible(False)
+        widget._active_gate.clear()
+        _update_sample()
+        if g:
+            widget._gates.append(g.selector(ax, color=next(cmaps)))
+            _refresh_tree()
+
+
+    def _onspanbutton():
+        """
+        Callback for when span gate button is pushed, created a SpanSelector
+        """
+        span = SpanSelector(
+            ax,
+            _onselectspan,
+            "horizontal",
+            useblit=False,
+            props=dict(alpha=0.5, facecolor="tab:blue"),
+            interactive=True,
+            drag_from_anywhere=False,
+            ignore_event_outside=True,
+        )
+        widget._active_gate = span
+
+    def _onselectpoly(verts):
+        """
+        Callback for when a span is selected using the SpanSelector widget
+        """
+        gate_name = (
+            "P_"
+            + widget.channel_1.value
+            + "_"
+            + widget.channel_2.value
+            + "_"
+            + widget.sample.value
+            + "_"
+            + widget.group.value
+            + "_"
+            + widget.population.value
+        )
+        gate_name = _prompt_for_gate_name(gate_name, W, widget)
+        if not gate_name:
+            return 0
+
+        # make gate
+        gate = PolyGate(
+            verts,
+            channels=(widget.channel_1.value, widget.channel_2.value),
+            region="in",
+            name=gate_name,
+            parent=W.groups[widget.group.value]
+            .samples[widget.sample.value]
+            .gates[widget.population.value],
+            workspace=W,
+        )
+
+        # append to sample
+        g = W.groups[widget.group.value].samples[widget.sample.value].append_gate(
+            gate=gate, update=True
+        )
+
+        gate.parent = None
+        widget._active_gate.set_active(False)
+        widget._active_gate.set_visible(False)
+        widget._active_gate.clear()
+        _update_sample()
+        if g:
+            widget._gates.append(g.selector(ax, color=next(cmaps)))
+            _refresh_tree()
+
+    def _onpolybutton():
+        """
+        Callback for when span gate button is pushed, created a SpanSelector
+        """
+        span = PolygonSelector(
+            ax,
+            _onselectpoly,
+            useblit=True,
+            props=dict(alpha=0.5, color="tab:blue"),
+        )
+        widget._active_gate = span
+
+    def _onselectrect(eclick, erelease):
+        """
+        Callback for when a span is selected using the SpanSelector widget
+        """
+
+        verts = [
+            (eclick.xdata, eclick.ydata),
+            (eclick.xdata, erelease.ydata),
+            (erelease.xdata, erelease.ydata),
+            (erelease.xdata, eclick.ydata),
+        ]
+        gate_name = (
+            "P_"
+            + widget.channel_1.value
+            + "_"
+            + widget.channel_2.value
+            + "_"
+            + widget.sample.value
+            + "_"
+            + widget.group.value
+            + "_"
+            + widget.population.value
+        )
+        gate_name = _prompt_for_gate_name(gate_name, W, widget)
+        if not gate_name:
+            return 0
+
+        # make gate
+        gate = PolyGate(
+            verts,
+            channels=(widget.channel_1.value, widget.channel_2.value),
+            region="in",
+            name=gate_name,
+            parent=W.groups[widget.group.value]
+            .samples[widget.sample.value]
+            .gates[widget.population.value],
+            workspace=W,
+        )
+
+        # append to sample
+        g = W.groups[widget.group.value].samples[widget.sample.value].append_gate(
+            gate=gate, update=True
+        )
+
+        gate.parent = None
+        widget._active_gate.set_active(False)
+        widget._active_gate.set_visible(False)
+        widget._active_gate.clear()
+        _update_sample()
+        if g:
+            widget._gates.append(g.selector(ax, color=next(cmaps)))
+            _refresh_tree()
+
+
+    def _onrectbutton():
+        """
+        Callback for when span gate button is pushed, created a SpanSelector
+        """
+        span = RectangleSelector(
+            ax,
+            _onselectrect,
+            useblit=True,
+            interactive=True,
+            props=dict(alpha=0.5, color="tab:blue"),
+        )
+        widget._active_gate = span
+
+    def _onremovesamplegate():
+        """
+        Callback for when clicking the remove sample gate button
+        """
+        if widget.pop_tree_widget.currentItem():
+            current_item_name = widget.pop_tree_widget.currentItem().text(0)
+            assert current_item_name != "root", "Can't delete root!"
+            W.groups[widget.group.value].samples[widget.sample.value].remove_gate(
+                current_item_name
+            )
+            _on_sample_changed()
+
+    def _onaddgroupgate():
+        """
+        Callback for when clicking the add group gate button
+        """
+        if widget.pop_tree_widget.currentItem():
+            current_item_name = widget.pop_tree_widget.currentItem().text(0)
+            g = W.groups[widget.group.value]
+            s = W.groups[widget.group.value].samples[widget.sample.value]
+            g.append_group_gate(s.gates[current_item_name])
+            _on_sample_changed()
+
+    def _onremovegroupgate():
+        """
+        Callback for when clicking the remove group gate button
+        """
+        if widget.pop_tree_widget.currentItem():
+            current_item_name = widget.pop_tree_widget.currentItem().text(0)
+            assert current_item_name in list(
+                W.groups[widget.group.value].gates
+            ), "Not a group gate! You can delete it from the sample."
+            assert current_item_name != "root", "Can't delete root!"
+            W.groups[widget.group.value].remove_group_gate(current_item_name)
+            _on_sample_changed()
+
+
+
+
+
     ### make toolbar and special buttons for selecting gates
     toolbar = NavigationToolbar(fc, widget.parent)
     widget.added_actions = {}
@@ -603,10 +608,16 @@ def gater(W):
     # Callbacks for sample change:
     @widget.sample.changed.connect
     def _on_sample_changed():
+        _update_sample()
         _refresh_tree()
         widget()
 
+    def _update_sample():
+        '''helper function to update the current active sample. Deals with subsampling'''
+        widget._sample = W.groups[widget.group.value].samples[widget.sample.value].subsample().compensate(W._compmat).transform(W._transform)
+
     def _refresh_tree():
+        '''helper function for refreshing the population/gating tree'''
         widget.population.choices = list(
             W.groups[widget.group.value].samples[widget.sample.value].gates.keys()
         )
@@ -650,15 +661,10 @@ def gater(W):
     widget._gates = (
         []
     )  # _gates are the active gates currently plotted. initialized to an empty list.
-
-    widget()
-
-    add_tree_to_qtreewidget(
-        widget.pop_tree_widget,
-        W.groups[widget.group.value].samples[widget.sample.value].gates[0],
-    )
-    set_item_by_name(widget.pop_tree_widget)
-
+    
+    
+    _on_sample_changed()
+    
     # exposes, should be removed eventually
     container.pop_tree_widget = widget.pop_tree_widget
     container.widget = widget
