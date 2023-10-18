@@ -16,6 +16,8 @@ from FlowCytometryTools import PolyGate as _PolyG
 from FlowCytometryTools import QuadGate as _QuadG
 from FlowCytometryTools import ThresholdGate as _ThreshG
 from FlowCytometryTools import IntervalGate as _IntG
+import matplotlib.pyplot as plt
+
 import copy
 import warnings
 
@@ -777,6 +779,14 @@ class ordDict(dict):
 
 from anytree import NodeMixin
 
+import matplotlib.colors as mcolors
+
+def generate_random_color(saturation_range=(0.5, 0.9), value_range=(0.5, 0.9)):
+    hue = np.random.rand()  # Random hue between [0, 1]
+    saturation = np.random.uniform(*saturation_range)  # Random saturation within specified range
+    value = np.random.uniform(*value_range)  # Random value within specified range
+    rgb = mcolors.hsv_to_rgb([hue, saturation, value])  # Convert HSV to RGB
+    return rgb
 
 class rootGate(NodeMixin):
     def __init__(self):
@@ -786,13 +796,17 @@ class rootGate(NodeMixin):
 
 
 class PolyGate(_PolyG, NodeMixin):
-    def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
+    def __init__(self, vert, channels, parent=None, workspace=None,color=None, **kwargs):
         _PolyG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
         self._compmat = workspace._compmat
         self._transform = workspace._transform
+        if color == None:
+            self._color = generate_random_color()
+        else:
+            self._color=color
 
-    def selector(self, ax, alpha=0.2, color="tab:blue"):
+    def selector(self, ax, alpha=0.2):
         from matplotlib.widgets import PolygonSelector
         from oyFlow.Gating import inverse_transform, transform
 
@@ -803,7 +817,7 @@ class PolyGate(_PolyG, NodeMixin):
             ax,
             _onselectpoly,
             useblit=True,
-            props=dict(alpha=alpha, color=color),
+            props=dict(alpha=alpha, color=self._color),
         )
 
         span._selection_completed = True
@@ -815,29 +829,39 @@ class PolyGate(_PolyG, NodeMixin):
 
 
 class QuadGate(_QuadG, NodeMixin):
-    def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
+    def __init__(self, vert, channels, parent=None, workspace=None,color=None, **kwargs):
         _QuadG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
         self._compmat = workspace._compmat
         self._transform = workspace._transform
-
+        if color == None:
+            self._color = generate_random_color()
+        else:
+            self._color=color
 
 class ThresholdGate(_ThreshG, NodeMixin):
-    def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
+    def __init__(self, vert, channels, parent=None, workspace=None,color=None, **kwargs):
         _ThreshG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
         self._compmat = workspace._compmat
         self._transform = workspace._transform
-
+        if color == None:
+            self._color = generate_random_color()
+        else:
+            self._color=color
 
 class IntervalGate(_IntG, NodeMixin):
-    def __init__(self, vert, channels, parent=None, workspace=None, **kwargs):
+    def __init__(self, vert, channels, parent=None, workspace=None,color=None, **kwargs):
         _IntG.__init__(self, vert, channels, **kwargs)
         self.parent = parent
         self._compmat = workspace._compmat
         self._transform = workspace._transform
-
-    def selector(self, ax, alpha=0.2, color="tab:blue"):
+        if color == None:
+            self._color = generate_random_color()
+        else:
+            self._color=color
+            
+    def selector(self, ax, alpha=0.2):
         from matplotlib.widgets import SpanSelector
         from oyFlow.Gating import inverse_transform, transform
 
@@ -849,7 +873,7 @@ class IntervalGate(_IntG, NodeMixin):
             _onselectspan,
             "horizontal",
             useblit=True,
-            props=dict(alpha=alpha, facecolor=color, edgecolor=color),
+            props=dict(alpha=alpha, facecolor=self._color, edgecolor=self._color),
             interactive=True,
             drag_from_anywhere=False,
             ignore_event_outside=True,

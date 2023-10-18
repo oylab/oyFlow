@@ -178,7 +178,7 @@ def gater(W):
 
     mplstyle.use("fast")
 
-    cmaps = cycle(["green", "blue", "red", "cyan", "magenta", "yellow"])
+    cmaps = cycle(["green", "blue", "red","cyan", "magenta",'lime','purple','darkorange', "yellow",'deeppink'])
 
     # make axis where things will be drawn
     matplotlib.use("Agg")
@@ -273,7 +273,7 @@ def gater(W):
             )
             # put gates in place if they have just one channel (span or threshold) and it is the current shown channel.
             widget._gates = [
-                ch.selector(ax, color=next(cmaps))
+                ch.selector(ax)
                 for ch in child_gates
                 if len(ch.channels) == 2
                 and ch.channels[0] == ch1_choice
@@ -306,7 +306,7 @@ def gater(W):
             )
             # put gates in place if they have just one channel (span or threshold) and it is the current shown channel.
             widget._gates = [
-                ch.selector(ax, color=next(cmaps))
+                ch.selector(ax)
                 for ch in child_gates
                 if len(ch.channels) == 1 and ch.channels[0] == ch1_choice
             ]
@@ -339,6 +339,7 @@ def gater(W):
             channels=widget.channel_1.value,
             region="in",
             name=gate_name,
+            color=next(cmaps),
             parent=W.groups[widget.group.value]
             .samples[widget.sample.value]
             .gates[widget.population.value],
@@ -356,7 +357,7 @@ def gater(W):
         widget._active_gate.clear()
         _update_sample()
         if g:
-            widget._gates.append(g.selector(ax, color=next(cmaps)))
+            widget._gates.append(g.selector(ax))
             _refresh_tree()
 
 
@@ -402,6 +403,7 @@ def gater(W):
             channels=(widget.channel_1.value, widget.channel_2.value),
             region="in",
             name=gate_name,
+            color=next(cmaps),
             parent=W.groups[widget.group.value]
             .samples[widget.sample.value]
             .gates[widget.population.value],
@@ -419,7 +421,7 @@ def gater(W):
         widget._active_gate.clear()
         _update_sample()
         if g:
-            widget._gates.append(g.selector(ax, color=next(cmaps)))
+            widget._gates.append(g.selector(ax))
             _refresh_tree()
 
     def _onpolybutton():
@@ -467,6 +469,7 @@ def gater(W):
             channels=(widget.channel_1.value, widget.channel_2.value),
             region="in",
             name=gate_name,
+            color=next(cmaps),
             parent=W.groups[widget.group.value]
             .samples[widget.sample.value]
             .gates[widget.population.value],
@@ -484,7 +487,7 @@ def gater(W):
         widget._active_gate.clear()
         _update_sample()
         if g:
-            widget._gates.append(g.selector(ax, color=next(cmaps)))
+            widget._gates.append(g.selector(ax))
             _refresh_tree()
 
 
@@ -638,6 +641,7 @@ def gater(W):
     # Callbacks for population change:
     @widget.population.changed.connect
     def _on_pop_changed():
+        _update_sample()
         widget()
 
     ### layout
@@ -669,5 +673,5 @@ def gater(W):
     container.pop_tree_widget = widget.pop_tree_widget
     container.widget = widget
     container.ax = ax
-
+    container.native.setWindowTitle('Gater of Gates!')
     return container
